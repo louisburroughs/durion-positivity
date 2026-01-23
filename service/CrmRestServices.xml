@@ -1,0 +1,1324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    CRM REST Service Wrappers for Spring Boot pos-customer microservice
+    
+    These services wrap the pos-customer REST API endpoints and provide
+    the integration layer between Moqui framework and the Spring Boot backend.
+    
+    All services forward JWT tokens from the current user session and handle
+    HTTP errors by mapping them to Moqui error messages.
+    
+    Related: .github/agents/api-catalog.yml CRM domain
+    Backend: durion-positivity-backend/pos-customer/src/main/java/com/positivity/customer/controller/CrmAccountsController.java
+-->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <!-- ========================================== -->
+    <!-- Party/Commercial Account Management -->
+    <!-- ========================================== -->
+
+    <service verb="create" noun="CommercialAccount" type="script">
+        <description>
+            Create a commercial account (Party) in pos-customer backend.
+            Maps to POST /v1/crm/parties
+            Requires: PARTY_CREATE permission
+        </description>
+        <in-parameters>
+            <parameter name="legalName" required="true"/>
+            <parameter name="displayName"/>
+            <parameter name="taxId"/>
+            <parameter name="billingTermsId"/>
+            <parameter name="partyType" default-value="COMMERCIAL"/>
+            <parameter name="status" default-value="ACTIVE"/>
+            <parameter name="parentPartyId"/>
+            <parameter name="primaryAddress" type="Map"/>
+            <parameter name="contacts" type="List"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId" required="true"/>
+            <parameter name="partyNumber" required="true"/>
+            <parameter name="message"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            import groovy.json.JsonOutput
+            
+            // Get backend URL from system property or environment variable
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            
+            // Build request body
+            Map requestBody = [
+                legalName: legalName,
+                displayName: displayName,
+                taxId: taxId,
+                billingTermsId: billingTermsId,
+                partyType: partyType,
+                status: status,
+                parentPartyId: parentPartyId,
+                primaryAddress: primaryAddress,
+                contacts: contacts
+            ]
+            
+            // Get JWT token from current user session
+            String jwtToken = ec.user.getLoginToken()
+            
+            // Make REST call to pos-customer backend
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/parties")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            // Handle response
+            if (response.statusCode == 201) {
+                Map responseBody = (Map) response.jsonObject()
+                partyId = responseBody.partyId
+                partyNumber = responseBody.partyNumber
+                message = responseBody.message
+            } else {
+                String errorMsg = "Failed to create commercial account: ${response.statusCode} ${response.reasonPhrase}"
+                if (response.statusCode >= 400) {
+                    Map errorBody = response.jsonObject() as Map
+                    if (errorBody?.message) errorMsg = errorBody.message
+                }
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="get" noun="Party" type="script">
+        <description>
+            Get party details by ID from pos-customer backend.
+            Maps to GET /v1/crm/parties/{partyId}
+            Requires: PARTY_VIEW permission
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId"/>
+            <parameter name="partyNumber"/>
+            <parameter name="legalName"/>
+            <parameter name="displayName"/>
+            <parameter name="taxId"/>
+            <parameter name="billingTermsId"/>
+            <parameter name="partyType"/>
+            <parameter name="status"/>
+            <parameter name="parentPartyId"/>
+            <parameter name="primaryAddress" type="Map"/>
+            <parameter name="createdAt"/>
+            <parameter name="updatedAt"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                context.putAll(responseBody)
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party not found: ${partyId}")
+                return
+            } else {
+                String errorMsg = "Failed to get party: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Party Search and Merge -->
+    <!-- ========================================== -->
+
+    <service verb="search" noun="Parties" type="script">
+        <description>
+            Search parties by name, tax ID, type, or status.
+            Maps to POST /v1/crm/parties/search
+            Requires: PARTY_VIEW permission
+        </description>
+        <in-parameters>
+            <parameter name="name"/>
+            <parameter name="taxId"/>
+            <parameter name="partyType"/>
+            <parameter name="status"/>
+            <parameter name="limit" type="Integer" default-value="50"/>
+            <parameter name="offset" type="Integer" default-value="0"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="parties" type="List"/>
+            <parameter name="totalCount" type="Integer"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                name: name,
+                taxId: taxId,
+                partyType: partyType,
+                status: status,
+                limit: limit,
+                offset: offset
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/parties/search")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                parties = responseBody.parties ?: []
+                totalCount = responseBody.totalCount ?: 0
+            } else {
+                String errorMsg = "Failed to search parties: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                parties = []
+                totalCount = 0
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="merge" noun="Parties" type="script">
+        <description>
+            Merge two parties (winner survives, loser is marked as MERGED).
+            Migrates contacts, external identifiers, and vehicle VINs.
+            Maps to POST /v1/crm/parties/{partyId}/merge
+            Requires: PARTY_MERGE permission
+        </description>
+        <in-parameters>
+            <parameter name="winningPartyId" required="true"><description>Party ID that survives merge</description></parameter>
+            <parameter name="losingPartyId" required="true"><description>Party ID to be merged (marked as MERGED)</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="winningPartyId"/>
+            <parameter name="losingPartyId"/>
+            <parameter name="contactsMigrated" type="Integer"/>
+            <parameter name="identifiersMigrated" type="Integer"/>
+            <parameter name="vehiclesMigrated" type="Integer"/>
+            <parameter name="message"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                losingPartyId: losingPartyId
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/parties/${winningPartyId}/merge")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                context.putAll(responseBody)
+            } else if (response.statusCode == 404) {
+                ec.message.addError("One or both parties not found for merge")
+                return
+            } else if (response.statusCode == 409) {
+                ec.message.addError("Cannot merge the same party with itself")
+                return
+            } else {
+                String errorMsg = "Failed to merge parties: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Contacts and Roles Management -->
+    <!-- ========================================== -->
+
+    <service verb="get" noun="ContactsWithRoles" type="script">
+        <description>
+            Get all contacts for a party with their roles.
+            Maps to GET /v1/crm/parties/{partyId}/contacts
+            Requires: PARTY_VIEW permission
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contacts" type="List"><description>List of contacts with embedded roles and hasPrimaryEmail flag</description></parameter>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}/contacts")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                contacts = responseBody.contacts ?: []
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party not found: ${partyId}")
+                contacts = []
+            } else {
+                String errorMsg = "Failed to get contacts: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                contacts = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="update" noun="ContactRoles" type="script">
+        <description>
+            Update contact roles for a specific contact within a party.
+            Maps to PUT /v1/crm/parties/{partyId}/contacts/{contactId}/roles
+            Requires: CONTACT_ROLE_ASSIGN permission
+            
+            Note: Current backend implementation returns success but does not persist roles.
+            Role persistence will be implemented when ContactRole entity is added.
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+            <parameter name="contactId" required="true"/>
+            <parameter name="roles" type="List" required="true"><description>List of role names (e.g., ["BILLING", "TECHNICAL"])</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                roles: roles
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}/contacts/${contactId}/roles")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                success = responseBody.success
+                message = responseBody.message
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party or contact not found")
+                success = false
+            } else {
+                String errorMsg = "Failed to update contact roles: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                success = false
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Communication Preferences -->
+    <!-- ========================================== -->
+
+    <service verb="get" noun="CommunicationPreferences" type="script">
+        <description>
+            Get communication preferences for a party.
+            Maps to GET /v1/crm/parties/{partyId}/communicationPreferences
+            Requires: CONTACT_PREFERENCE_VIEW permission
+            
+            Note: Current backend implementation returns defaults.
+            Preference persistence will be implemented when CommunicationPreference entity is added.
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="emailPreference" default-value="OPT_IN"><description>EMAIL, SMS, PHONE preference: OPT_IN, OPT_OUT, UNSUBSCRIBED</description></parameter>
+            <parameter name="smsPreference" default-value="OPT_IN"/>
+            <parameter name="phonePreference" default-value="OPT_IN"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}/communicationPreferences")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                emailPreference = responseBody.emailPreference ?: 'OPT_IN'
+                smsPreference = responseBody.smsPreference ?: 'OPT_IN'
+                phonePreference = responseBody.phonePreference ?: 'OPT_IN'
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party not found: ${partyId}")
+            } else {
+                String errorMsg = "Failed to get communication preferences: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="upsert" noun="CommunicationPreferences" type="script">
+        <description>
+            Create or update communication preferences for a party.
+            Maps to POST /v1/crm/parties/{partyId}/communicationPreferences
+            Requires: CONTACT_PREFERENCE_EDIT permission
+            
+            Note: Current backend implementation validates but does not persist preferences.
+            Preference persistence will be implemented when CommunicationPreference entity is added.
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+            <parameter name="emailPreference" required="true"><description>OPT_IN, OPT_OUT, or UNSUBSCRIBED</description></parameter>
+            <parameter name="smsPreference" required="true"/>
+            <parameter name="phonePreference" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                emailPreference: emailPreference,
+                smsPreference: smsPreference,
+                phonePreference: phonePreference
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}/communicationPreferences")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                success = responseBody.success
+                message = responseBody.message
+            } else if (response.statusCode == 400) {
+                Map errorBody = response.jsonObject() as Map
+                ec.message.addError(errorBody?.message ?: "Invalid preference values")
+                success = false
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party not found: ${partyId}")
+                success = false
+            } else {
+                String errorMsg = "Failed to upsert communication preferences: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                success = false
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Vehicle Management -->
+    <!-- ========================================== -->
+
+    <service verb="create" noun="VehicleForParty" type="script">
+        <description>
+            Add a vehicle (VIN) to a party's account.
+            Maps to POST /v1/crm/parties/{partyId}/vehicles
+            Requires: VEHICLE_CREATE permission
+            
+            Enforces VIN uniqueness per party (409 Conflict if duplicate).
+        </description>
+        <in-parameters>
+            <parameter name="partyId" required="true"/>
+            <parameter name="vin" required="true"><description>Vehicle Identification Number (17 characters)</description></parameter>
+            <parameter name="nickname"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicleId"/>
+            <parameter name="message"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                vin: vin,
+                nickname: nickname
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/parties/${partyId}/vehicles")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 201) {
+                Map responseBody = (Map) response.jsonObject()
+                vehicleId = responseBody.vehicleId
+                message = responseBody.message
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Party not found: ${partyId}")
+                return
+            } else if (response.statusCode == 409) {
+                Map errorBody = response.jsonObject() as Map
+                ec.message.addError(errorBody?.message ?: "Vehicle VIN already exists for this party")
+                return
+            } else {
+                String errorMsg = "Failed to create vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Legacy Customer CRUD Operations -->
+    <!-- ========================================== -->
+
+    <service verb="list" noun="Customers" type="script">
+        <description>
+            Get all customers (legacy endpoint).
+            Maps to GET /v1/crm
+            Requires: PARTY_VIEW permission
+        </description>
+        <out-parameters>
+            <parameter name="customers" type="List"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                customers = (List) response.jsonObject()
+            } else {
+                String errorMsg = "Failed to list customers: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                customers = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="get" noun="Customer" type="script">
+        <description>
+            Get customer by ID (legacy endpoint).
+            Maps to GET /v1/crm/{id}
+            Requires: PARTY_VIEW permission
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="customer" type="Map"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm/${customerId}")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                customer = (Map) response.jsonObject()
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer not found: ${customerId}")
+            } else {
+                String errorMsg = "Failed to get customer: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="create" noun="Customer" type="script">
+        <description>
+            Create new customer (legacy endpoint).
+            Maps to POST /v1/crm
+            Requires: PARTY_CREATE permission
+        </description>
+        <in-parameters>
+            <parameter name="customer" type="Map" required="true"><description>Customer object to create</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="customer" type="Map"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(customer)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                customer = (Map) response.jsonObject()
+            } else {
+                String errorMsg = "Failed to create customer: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="update" noun="Customer" type="script">
+        <description>
+            Update existing customer (legacy endpoint).
+            Maps to PUT /v1/crm/{id}
+            Requires: PARTY_EDIT permission
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="customer" type="Map" required="true"><description>Updated customer object</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="customer" type="Map"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/${customerId}")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(customer)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                customer = (Map) response.jsonObject()
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer not found: ${customerId}")
+            } else {
+                String errorMsg = "Failed to update customer: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="delete" noun="Customer" type="script">
+        <description>
+            Delete customer by ID (legacy endpoint).
+            Maps to DELETE /v1/crm/{id}
+            Requires: PARTY_DEACTIVATE permission
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('DELETE')
+                .uri("${backendUrl}/v1/crm/${customerId}")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 204) {
+                success = true
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer not found: ${customerId}")
+                success = false
+            } else {
+                String errorMsg = "Failed to delete customer: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                success = false
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Account Tier Management (Stubbed) -->
+    <!-- ========================================== -->
+
+    <service verb="get" noun="AccountTier" type="script">
+        <description>
+            Get account tier for an account.
+            Maps to GET /v1/crm/accounts/{accountId}/tier
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="accountId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="tier" type="Map"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri("${backendUrl}/v1/crm/accounts/${accountId}/tier")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                tier = (Map) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Account tier feature not yet implemented", "warning")
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to get account tier: ${response.statusCode} ${response.reasonPhrase}"
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="resolve" noun="AccountTiers" type="script">
+        <description>
+            Batch resolve account tiers.
+            Maps to POST /v1/crm/accounts/tierResolve
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="accountIds" type="List" required="true"><description>List of account IDs to resolve tiers for</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="tiers" type="List"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                accountIds: accountIds
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/accounts/tierResolve")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                tiers = (List) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Account tier resolution feature not yet implemented", "warning")
+                tiers = []
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to resolve account tiers: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                tiers = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Vehicle Management (Additional Operations - Stubbed) -->
+    <!-- ========================================== -->
+
+    <service verb="create" noun="Vehicles" type="script">
+        <description>
+            Create vehicle(s) for customer (legacy path).
+            Maps to POST /v1/crm/{customerId}/vehicles
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicles" type="List" required="true"><description>List of vehicles to create</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="createdVehicles" type="List"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                vehicles: vehicles
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200 || response.statusCode == 201) {
+                createdVehicles = (List) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Batch vehicle creation not yet implemented", "warning")
+                createdVehicles = []
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to create vehicles: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                createdVehicles = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="update" noun="Vehicles" type="script">
+        <description>
+            Update vehicle(s) for customer (legacy path).
+            Maps to PUT /v1/crm/{customerId}/vehicles
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicles" type="List" required="true"><description>List of vehicles to update</description></parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="updatedVehicles" type="List"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                vehicles: vehicles
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                updatedVehicles = (List) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Batch vehicle update not yet implemented", "warning")
+                updatedVehicles = []
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to update vehicles: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                updatedVehicles = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="delete" noun="Vehicle" type="script">
+        <description>
+            Delete vehicle for customer.
+            Maps to DELETE /v1/crm/{customerId}/vehicles/{vehicleId}
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicleId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('DELETE')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 204) {
+                success = true
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Vehicle deletion not yet implemented", "warning")
+                success = false
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to delete vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                success = false
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="transfer" noun="Vehicle" type="script">
+        <description>
+            Transfer vehicle from one customer to another.
+            Maps to PUT /v1/crm/{customerId}/vehicles/{vehicleId}/transfer
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="fromCustomerId" required="true"/>
+            <parameter name="vehicleId" required="true"/>
+            <parameter name="toCustomerId" required="true"/>
+            <parameter name="transferReason"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                toCustomerId: toCustomerId,
+                transferReason: transferReason
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/${fromCustomerId}/vehicles/${vehicleId}/transfer")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                success = responseBody.success
+                message = responseBody.message
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Vehicle transfer not yet implemented", "warning")
+                success = false
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to transfer vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                success = false
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="get" noun="Vehicle" type="script">
+        <description>
+            Get vehicle by ID with optional owner details.
+            Maps to GET /v1/crm/vehicles/{vehicleId}
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="vehicleId" required="true"/>
+            <parameter name="includeOwner" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicle" type="Map"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            String uri = "${backendUrl}/v1/crm/vehicles/${vehicleId}"
+            if (includeOwner) {
+                uri += "?include=owner"
+            }
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri(uri)
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                vehicle = (Map) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Vehicle not found: ${vehicleId}")
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Vehicle lookup not yet implemented", "warning")
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to get vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="list" noun="VehiclesFiltered" type="script">
+        <description>
+            Get all vehicles with optional filters (make, model, year).
+            Maps to GET /v1/crm/vehicles
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="make"/>
+            <parameter name="model"/>
+            <parameter name="year" type="Integer"/>
+            <parameter name="sortField" default-value="id"/>
+            <parameter name="sortOrder" default-value="ASC"/>
+            <parameter name="includeOwner" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicles" type="List"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            // Build query parameters
+            List<String> queryParams = []
+            if (make) queryParams.add("make=${make}")
+            if (model) queryParams.add("model=${model}")
+            if (year) queryParams.add("year=${year}")
+            if (sortField) queryParams.add("sortField=${sortField}")
+            if (sortOrder) queryParams.add("sortOrder=${sortOrder}")
+            if (includeOwner) queryParams.add("include=owner")
+            
+            String uri = "${backendUrl}/v1/crm/vehicles"
+            if (queryParams) {
+                uri += "?" + queryParams.join("&")
+            }
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri(uri)
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                vehicles = (List) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Vehicle listing not yet implemented", "warning")
+                vehicles = []
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to list vehicles: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                vehicles = []
+            }
+        ]]></script></actions>
+    </service>
+
+    <service verb="get" noun="VehiclesForCustomer" type="script">
+        <description>
+            Get specific vehicle for a customer.
+            Maps to GET /v1/crm/{customerId}/vehicles/{vehicleId}
+            
+            Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicleId" required="true"/>
+            <parameter name="includeOwner" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicle" type="Map"/>
+            <parameter name="notImplemented" type="Boolean" default-value="true"/>
+        </out-parameters>
+        <actions><script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            String uri = "${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}"
+            if (includeOwner) {
+                uri += "?include=owner"
+            }
+            
+            RestClient restClient = ec.service.rest()
+                .method('GET')
+                .uri(uri)
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                vehicle = (Map) response.jsonObject()
+                notImplemented = false
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Vehicle not found for customer")
+            } else if (response.statusCode == 501) {
+                ec.message.addMessage("Customer vehicle lookup not yet implemented", "warning")
+                notImplemented = true
+            } else {
+                String errorMsg = "Failed to get vehicle for customer: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+            }
+        ]]></script></actions>
+    </service>
+
+</services>
