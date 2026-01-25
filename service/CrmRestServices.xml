@@ -292,7 +292,7 @@
         <description>
             Get all contacts for a party with their roles.
             Maps to GET /v1/crm/parties/{partyId}/contacts
-            Requires: PARTY_VIEW permission
+            Requires: CONTACT_VIEW permission
         </description>
         <in-parameters>
             <parameter name="partyId" required="true"/>
@@ -919,6 +919,7 @@
         <description>
             Create vehicle(s) for customer (legacy path).
             Maps to POST /v1/crm/{customerId}/vehicles
+            Requires: VEHICLE_CREATE permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -976,6 +977,7 @@
         <description>
             Update vehicle(s) for customer (legacy path).
             Maps to PUT /v1/crm/{customerId}/vehicles
+            Requires: VEHICLE_EDIT permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -1033,6 +1035,7 @@
         <description>
             Delete vehicle for customer.
             Maps to DELETE /v1/crm/{customerId}/vehicles/{vehicleId}
+            Requires: VEHICLE_DEACTIVATE permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -1083,6 +1086,7 @@
         <description>
             Transfer vehicle from one customer to another.
             Maps to PUT /v1/crm/{customerId}/vehicles/{vehicleId}/transfer
+            Requires: VEHICLE_PARTY_ASSOC_EDIT permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -1146,6 +1150,7 @@
         <description>
             Get vehicle by ID with optional owner details.
             Maps to GET /v1/crm/vehicles/{vehicleId}
+            Requires: VEHICLE_VIEW permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -1201,6 +1206,7 @@
         <description>
             Get all vehicles with optional filters (make, model, year).
             Maps to GET /v1/crm/vehicles
+            Requires: VEHICLE_SEARCH permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
@@ -1269,6 +1275,7 @@
         <description>
             Get specific vehicle for a customer.
             Maps to GET /v1/crm/{customerId}/vehicles/{vehicleId}
+            Requires: VEHICLE_VIEW permission
             
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
