@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    JWT Assertion Services for API Gateway Authentication (CAP-275 / ADR-0011)
+    
+    These services issue HMAC-signed JWT assertions for backend API calls.
+    The API Gateway validates these assertions and builds SecurityContext
+    for downstream services.
+    
+    Configuration:
+    - moqui.assertion.secret: HMAC shared secret (from secrets store)
+    - moqui.assertion.issuer: Token issuer (default: "moqui")
+    - moqui.assertion.audience: Token audience (default: "api-gateway:local")
+    - moqui.assertion.ttl: Token TTL in seconds (default: 900, range: 60-3600)
+    - moqui.assertion.enabled: Enable/disable issuance (default: true)
+    - moqui.assertion.audit.enabled: Enable audit logging (default: false)
+    
+    Error Codes:
+    - MOQUI_ASSERTION_INVALID_INPUT: Missing required claims (sub, roles)
+    - MOQUI_ASSERTION_SECRET_UNAVAILABLE: Cannot retrieve signing secret
+    - MOQUI_ASSERTION_DISABLED: Assertion issuance is disabled
+    - MOQUI_ASSERTION_ISSUE_ERROR: General issuance failure
+    
+    Related:
+    - ADR-0011: Security Context Architecture
+    - domains/security/.business-rules/BACKEND_CONTRACT_GUIDE.md
+    - durion-positivity-backend/pos-api-gateway (token validation)
+-->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <!-- ========================================== -->
+    <!-- JWT Assertion Issuance Service -->
+    <!-- ========================================== -->
+
+    <service verb="issue" noun="JwtAssertion" type="script">
+        <description>
+            Issue a signed JWT assertion for backend API calls.
+            
+            The assertion contains:
+            - iss: Issuer (configured, default "moqui")
+            - aud: Audience (configured, default "api-gateway:local")
+            - sub: Subject (current userId, required)
+            - roles: User roles (array, required for role-based calls)
+            - iat: Issued at (epoch seconds)
+            - exp: Expiration (iat + TTL)
+            - jti: Unique token ID (UUID)
+            - tenantId: Optional tenant context
+            - storeId: Optional store context
+            
+            Returns compact JWT string or throws AssertionException.
+        </description>
+        <in-parameters>
+            <parameter name="tenantId" type="String">
+                <description>Optional tenant identifier for multi-tenant context</description>
+            </parameter>
+            <parameter name="storeId" type="String">
+                <description>Optional store identifier for store-scoped operations</description>
+            </parameter>
+            <parameter name="additionalClaims" type="Map">
+                <description>Optional additional claims to include in token</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="token" type="String" required="true">
+                <description>Compact JWT string (Base64URL encoded)</description>
+            </parameter>
+            <parameter name="jti" type="String" required="true">
+                <description>Token ID for tracing/audit</description>
+            </parameter>
+            <parameter name="expiresAt" type="Long" required="true">
+                <description>Token expiration timestamp (epoch seconds)</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import io.jsonwebtoken.Jwts
+            import io.jsonwebtoken.SignatureAlgorithm
+            import javax.crypto.spec.SecretKeySpec
+            import java.nio.charset.StandardCharsets
+            import java.time.Instant
+            import java.util.UUID
+            import org.moqui.context.ExecutionContext
+            import org.slf4j.Logger
+            import org.slf4j.LoggerFactory
+
+            Logger logger = LoggerFactory.getLogger("AssertionService")
+
+            // Get execution context
+            ExecutionContext ec = context.ec
+
+            // Check if assertions are enabled
+            boolean assertionsEnabled = ec.factory.confXmlRoot.'component-list'.'assertion'[0]?.'@enabled' != 'false'
+            String enabledConfig = System.getProperty('moqui.assertion.enabled',
+                                   System.getenv('MOQUI_ASSERTION_ENABLED') ?: 'true')
+            if (enabledConfig == 'false' || !assertionsEnabled) {
+                ec.message.addError("Assertion issuance is disabled")
+                throw new org.moqui.BaseException("MOQUI_ASSERTION_DISABLED: Assertion issuance is disabled")
+            }
+
+            // Get current user context
+            String userId = ec.user.userId
+            if (!userId || userId.trim().isEmpty()) {
+                logger.warn("Assertion issuance failed: no authenticated user")
+                ec.message.addError("Cannot issue assertion: no authenticated user")
+                throw new org.moqui.BaseException("MOQUI_ASSERTION_INVALID_INPUT: Subject (userId) is required")
+            }
+
+            // Get user roles from Moqui
+            List<String> userRoles = []
+            try {
+                // Query user's role assignments
+                def roleAssignments = ec.entity.find("moqui.security.UserGroupMember")
+                    .condition("userId", userId)
+                    .list()
+                roleAssignments.each { assignment ->
+                    String groupId = assignment.userGroupId
+                    if (groupId) {
+                        userRoles.add(groupId)
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Could not load roles from entity: ${e.message}")
+            }
+
+            // Fallback: check if roles are available from user facade
+            if (userRoles.isEmpty() && ec.user.userGroupIdSet) {
+                userRoles.addAll(ec.user.userGroupIdSet)
+            }
+
+            // Get configuration values
+            String issuer = System.getProperty('moqui.assertion.issuer',
+                           System.getenv('MOQUI_ASSERTION_ISSUER') ?: 'moqui')
+            
+            String audience = System.getProperty('moqui.assertion.audience',
+                             System.getenv('MOQUI_ASSERTION_AUDIENCE') ?: 'api-gateway:local')
+            
+            int ttlSeconds = 900 // default 15 minutes
+            String ttlConfig = System.getProperty('moqui.assertion.ttl',
+                              System.getenv('MOQUI_ASSERTION_TTL'))
+            if (ttlConfig) {
+                try {
+                    int configuredTtl = Integer.parseInt(ttlConfig)
+                    // Enforce bounds: min 60s, max 3600s
+                    ttlSeconds = Math.max(60, Math.min(3600, configuredTtl))
+                } catch (NumberFormatException nfe) {
+                    logger.warn("Invalid TTL configuration '${ttlConfig}', using default 900s")
+                }
+            }
+
+            // Get signing secret
+            String secret = null
+            try {
+                // Try system property first
+                secret = System.getProperty('moqui.assertion.secret')
+                
+                // Try environment variable
+                if (!secret) {
+                    secret = System.getenv('MOQUI_ASSERTION_SECRET')
+                }
+                
+                // Try secrets file (for local development)
+                if (!secret) {
+                    File secretFile = new File('./secrets/moqui-hmac.key')
+                    if (secretFile.exists()) {
+                        secret = secretFile.text.trim()
+                    }
+                }
+                
+                // Validate secret
+                if (!secret || secret.trim().isEmpty()) {
+                    throw new RuntimeException("Secret not configured")
+                }
+                
+                // Validate minimum length (32 bytes for HS256)
+                if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+                    throw new RuntimeException("Secret must be at least 32 characters")
+                }
+            } catch (Exception e) {
+                logger.error("Failed to retrieve signing secret: ${e.class.simpleName}")
+                ec.message.addError("Cannot issue assertion: signing secret unavailable")
+                throw new org.moqui.BaseException("MOQUI_ASSERTION_SECRET_UNAVAILABLE: ${e.message}")
+            }
+
+            // Build JWT claims
+            Instant now = Instant.now()
+            long iat = now.epochSecond
+            long exp = now.plusSeconds(ttlSeconds).epochSecond
+            String tokenJti = UUID.randomUUID().toString()
+
+            try {
+                // Create signing key
+                byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8)
+                SecretKeySpec signingKey = new SecretKeySpec(secretBytes, "HmacSHA256")
+
+                // Build JWT
+                def jwtBuilder = Jwts.builder()
+                    .id(tokenJti)
+                    .issuer(issuer)
+                    .audience().add(audience).and()
+                    .subject(userId)
+                    .claim("roles", userRoles)
+                    .issuedAt(Date.from(now))
+                    .expiration(Date.from(now.plusSeconds(ttlSeconds)))
+                    .signWith(signingKey)
+
+                // Add optional claims
+                if (tenantId) {
+                    jwtBuilder.claim("tenantId", tenantId)
+                }
+                if (storeId) {
+                    jwtBuilder.claim("storeId", storeId)
+                }
+                if (additionalClaims) {
+                    additionalClaims.each { key, value ->
+                        if (key && value != null) {
+                            jwtBuilder.claim(key.toString(), value)
+                        }
+                    }
+                }
+
+                // Generate compact token
+                token = jwtBuilder.compact()
+                jti = tokenJti
+                expiresAt = exp
+
+                // Log for observability (never log secret or full token)
+                logger.info("Assertion issued: jti={}, sub={}, iss={}, aud={}, roles={}, exp={}",
+                           jti, userId, issuer, audience, userRoles.size(), exp)
+
+                // Audit logging if enabled
+                boolean auditEnabled = System.getProperty('moqui.assertion.audit.enabled',
+                                       System.getenv('MOQUI_ASSERTION_AUDIT_ENABLED') ?: 'false') == 'true'
+                if (auditEnabled) {
+                    try {
+                        ec.service.sync().name("durion.positivity.AssertionServices.create#AssertionAudit")
+                            .parameters([
+                                jti: jti,
+                                userId: userId,
+                                audience: audience,
+                                issuedAt: iat,
+                                expiresAt: exp,
+                                status: 'ISSUED',
+                                rolesCount: userRoles.size()
+                            ])
+                            .disableAuthz()
+                            .call()
+                    } catch (Exception auditEx) {
+                        logger.warn("Failed to create assertion audit record: ${auditEx.message}")
+                    }
+                }
+
+            } catch (Exception e) {
+                logger.error("Failed to issue JWT assertion: ${e.class.simpleName}: ${e.message}")
+                ec.message.addError("Failed to issue assertion")
+                throw new org.moqui.BaseException("MOQUI_ASSERTION_ISSUE_ERROR: ${e.message}")
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Assertion Configuration Service -->
+    <!-- ========================================== -->
+
+    <service verb="get" noun="AssertionConfig" type="script">
+        <description>
+            Get current assertion configuration (for admin UI).
+            Does NOT return the secret value.
+        </description>
+        <out-parameters>
+            <parameter name="enabled" type="Boolean"/>
+            <parameter name="issuer" type="String"/>
+            <parameter name="audience" type="String"/>
+            <parameter name="ttlSeconds" type="Integer"/>
+            <parameter name="auditEnabled" type="Boolean"/>
+            <parameter name="secretConfigured" type="Boolean"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            enabled = System.getProperty('moqui.assertion.enabled',
+                      System.getenv('MOQUI_ASSERTION_ENABLED') ?: 'true') == 'true'
+            
+            issuer = System.getProperty('moqui.assertion.issuer',
+                    System.getenv('MOQUI_ASSERTION_ISSUER') ?: 'moqui')
+            
+            audience = System.getProperty('moqui.assertion.audience',
+                      System.getenv('MOQUI_ASSERTION_AUDIENCE') ?: 'api-gateway:local')
+            
+            String ttlConfig = System.getProperty('moqui.assertion.ttl',
+                              System.getenv('MOQUI_ASSERTION_TTL') ?: '900')
+            try {
+                ttlSeconds = Integer.parseInt(ttlConfig)
+            } catch (NumberFormatException e) {
+                ttlSeconds = 900
+            }
+            
+            auditEnabled = System.getProperty('moqui.assertion.audit.enabled',
+                          System.getenv('MOQUI_ASSERTION_AUDIT_ENABLED') ?: 'false') == 'true'
+            
+            // Check if secret is configured (don't return the value)
+            String secret = System.getProperty('moqui.assertion.secret',
+                           System.getenv('MOQUI_ASSERTION_SECRET'))
+            if (!secret) {
+                File secretFile = new File('./secrets/moqui-hmac.key')
+                secretConfigured = secretFile.exists()
+            } else {
+                secretConfigured = true
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Assertion Audit Service (Optional) -->
+    <!-- ========================================== -->
+
+    <service verb="create" noun="AssertionAudit" type="script">
+        <description>
+            Create an audit record for an issued assertion.
+            Only called when moqui.assertion.audit.enabled=true.
+        </description>
+        <in-parameters>
+            <parameter name="jti" type="String" required="true"/>
+            <parameter name="userId" type="String" required="true"/>
+            <parameter name="audience" type="String"/>
+            <parameter name="issuedAt" type="Long"/>
+            <parameter name="expiresAt" type="Long"/>
+            <parameter name="status" type="String" default-value="ISSUED"/>
+            <parameter name="rolesCount" type="Integer"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="auditId" type="String"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.context.ExecutionContext
+            import org.slf4j.Logger
+            import org.slf4j.LoggerFactory
+            
+            Logger logger = LoggerFactory.getLogger("AssertionAudit")
+            ExecutionContext ec = context.ec
+            
+            try {
+                // Create audit record using entity
+                def auditRecord = ec.entity.makeValue("durion.positivity.AssertionAudit")
+                auditRecord.auditId = ec.entity.sequencedIdPrimary("durion.positivity.AssertionAudit", null)
+                auditRecord.jti = jti
+                auditRecord.userId = userId
+                auditRecord.audience = audience
+                auditRecord.issuedAt = issuedAt ? new java.sql.Timestamp(issuedAt * 1000) : null
+                auditRecord.expiresAt = expiresAt ? new java.sql.Timestamp(expiresAt * 1000) : null
+                auditRecord.status = status
+                auditRecord.rolesCount = rolesCount
+                auditRecord.createdDate = ec.user.nowTimestamp
+                auditRecord.create()
+                
+                auditId = auditRecord.auditId
+                logger.debug("Created assertion audit: auditId={}, jti={}", auditId, jti)
+            } catch (Exception e) {
+                // Don't fail the main flow for audit errors
+                logger.warn("Failed to create assertion audit: ${e.message}")
+                auditId = null
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- HTTP Client Helper with Assertion -->
+    <!-- ========================================== -->
+
+    <service verb="call" noun="BackendApi" type="script">
+        <description>
+            Call a backend API with JWT assertion authentication.
+            
+            This is a convenience wrapper that:
+            1. Issues a JWT assertion for the current user
+            2. Makes the HTTP request with Authorization header
+            3. Handles errors and returns response
+            
+            Use this for all backend API calls that require authentication.
+        </description>
+        <in-parameters>
+            <parameter name="baseUrl" type="String" required="true">
+                <description>Backend service base URL (e.g., http://localhost:8081)</description>
+            </parameter>
+            <parameter name="path" type="String" required="true">
+                <description>API path (e.g., /v1/customers/123)</description>
+            </parameter>
+            <parameter name="method" type="String" default-value="GET">
+                <description>HTTP method (GET, POST, PUT, DELETE, PATCH)</description>
+            </parameter>
+            <parameter name="body" type="Map">
+                <description>Request body for POST/PUT/PATCH</description>
+            </parameter>
+            <parameter name="queryParams" type="Map">
+                <description>Query parameters</description>
+            </parameter>
+            <parameter name="tenantId" type="String">
+                <description>Tenant context for assertion</description>
+            </parameter>
+            <parameter name="storeId" type="String">
+                <description>Store context for assertion</description>
+            </parameter>
+            <parameter name="timeoutMs" type="Integer" default-value="30000">
+                <description>Request timeout in milliseconds</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="statusCode" type="Integer"/>
+            <parameter name="responseBody" type="Object"/>
+            <parameter name="headers" type="Map"/>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="errorMessage" type="String"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+            import groovy.json.JsonOutput
+            import groovy.json.JsonSlurper
+            import org.moqui.context.ExecutionContext
+            import org.slf4j.Logger
+            import org.slf4j.LoggerFactory
+
+            Logger logger = LoggerFactory.getLogger("BackendApiClient")
+            ExecutionContext ec = context.ec
+
+            // Issue JWT assertion
+            String jwtToken = null
+            try {
+                def assertionResult = ec.service.sync()
+                    .name("durion.positivity.AssertionServices.issue#JwtAssertion")
+                    .parameters([tenantId: tenantId, storeId: storeId])
+                    .call()
+                jwtToken = assertionResult.token
+            } catch (Exception e) {
+                logger.error("Failed to issue assertion for backend call: ${e.message}")
+                success = false
+                errorMessage = "Authentication failed: ${e.message}"
+                statusCode = 401
+                return
+            }
+
+            // Build URL
+            String url = baseUrl
+            if (!url.endsWith('/') && !path.startsWith('/')) {
+                url += '/'
+            }
+            url += path
+
+            // Add query parameters
+            if (queryParams) {
+                String queryString = queryParams.collect { k, v -> 
+                    "${URLEncoder.encode(k.toString(), 'UTF-8')}=${URLEncoder.encode(v?.toString() ?: '', 'UTF-8')}"
+                }.join('&')
+                url += (url.contains('?') ? '&' : '?') + queryString
+            }
+
+            try {
+                RestClient restClient = ec.service.rest()
+                    .method(method.toUpperCase())
+                    .uri(url)
+                    .addHeader("Authorization", "Bearer ${jwtToken}")
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .addHeader("X-Correlation-Id", UUID.randomUUID().toString())
+                    .timeout(timeoutMs)
+
+                if (body && ['POST', 'PUT', 'PATCH'].contains(method.toUpperCase())) {
+                    restClient.jsonObject(body)
+                }
+
+                RestClient.RestResponse response = restClient.call()
+                
+                statusCode = response.statusCode
+                headers = response.headers()
+                
+                String responseText = response.text()
+                if (responseText) {
+                    try {
+                        responseBody = new JsonSlurper().parseText(responseText)
+                    } catch (Exception parseEx) {
+                        responseBody = responseText
+                    }
+                }
+
+                success = statusCode >= 200 && statusCode < 300
+                if (!success) {
+                    errorMessage = "HTTP ${statusCode}: ${responseBody?.message ?: responseBody?.error ?: 'Request failed'}"
+                    logger.warn("Backend API call failed: {} {} -> {}", method, path, statusCode)
+                } else {
+                    logger.debug("Backend API call succeeded: {} {} -> {}", method, path, statusCode)
+                }
+
+            } catch (Exception e) {
+                logger.error("Backend API call error: {} {}: {}", method, path, e.message)
+                success = false
+                statusCode = 500
+                errorMessage = "Request failed: ${e.message}"
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+</services>
