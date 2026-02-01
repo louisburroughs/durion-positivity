@@ -67,3 +67,6 @@ export interface AuthToken {
   expiresAt: number;
   refreshToken?: string;
 }
+
+// Re-export security types
+export * from './security';

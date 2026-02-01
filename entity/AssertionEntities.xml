@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Assertion Entities for CAP-275 / ADR-0011
+    
+    These entities support JWT assertion issuance, audit trails,
+    and traceability for security compliance.
+-->
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
+
+    <!-- ========================================== -->
+    <!-- Assertion Audit Entity -->
+    <!-- ========================================== -->
+
+    <entity entity-name="AssertionAudit" package="durion.positivity" short-alias="AssertionAudit" cache="never" authorize-skip="create">
+        <description>
+            Audit trail for JWT assertions issued by the AssertionService.
+            Only populated when moqui.assertion.audit.enabled=true.
+            
+            Records:
+            - Who received assertions (userId)
+            - When assertions were issued and expire
+            - Unique token identifiers for tracing (jti)
+            - Current status for monitoring
+            
+            Used for:
+            - Security auditing and compliance
+            - Debugging authentication issues
+            - Monitoring assertion usage patterns
+        </description>
+
+        <field name="auditId" type="id" is-pk="true">
+            <description>Primary key - sequenced ID</description>
+        </field>
+        <field name="jti" type="id">
+            <description>JWT Token ID (jti claim) - unique identifier for the token</description>
+        </field>
+        <field name="userId" type="id">
+            <description>User who received the assertion (sub claim)</description>
+        </field>
+        <field name="audience" type="text-medium">
+            <description>Target audience for the assertion (aud claim)</description>
+        </field>
+        <field name="issuedAt" type="date-time">
+            <description>When the assertion was issued (iat claim as timestamp)</description>
+        </field>
+        <field name="expiresAt" type="date-time">
+            <description>When the assertion expires (exp claim as timestamp)</description>
+        </field>
+        <field name="status" type="id">
+            <description>Assertion status: ISSUED, USED, EXPIRED, REVOKED</description>
+        </field>
+        <field name="rolesCount" type="number-integer">
+            <description>Number of roles included in the assertion</description>
+        </field>
+        <field name="createdDate" type="date-time">
+            <description>When this audit record was created</description>
+        </field>
+
+        <!-- Indexes for common queries -->
+        <index name="ASSERTION_AUDIT_JTI" unique="true">
+            <index-field name="jti"/>
+        </index>
+        <index name="ASSERTION_AUDIT_USER">
+            <index-field name="userId"/>
+            <index-field name="issuedAt"/>
+        </index>
+        <index name="ASSERTION_AUDIT_STATUS">
+            <index-field name="status"/>
+            <index-field name="expiresAt"/>
+        </index>
+
+        <!-- Relationship to Moqui user -->
+        <relationship type="one" fk-name="ASN_AUD_USER" related="moqui.security.UserAccount">
+            <key-map field-name="userId"/>
+        </relationship>
+
+        <!-- Master definition for data tools -->
+        <master>
+            <detail relationship="user"/>
+        </master>
+    </entity>
+
+    <!-- ========================================== -->
+    <!-- Assertion Status Enumeration -->
+    <!-- ========================================== -->
+
+    <entity entity-name="AssertionStatus" package="durion.positivity.type" short-alias="AssertionStatus" cache="true" authorize-skip="view">
+        <description>Status enumeration for assertion lifecycle</description>
+        <field name="statusId" type="id" is-pk="true"/>
+        <field name="description" type="text-medium"/>
+        <field name="sequenceNum" type="number-integer"/>
+        <seed-data>
+            <durion.positivity.type.AssertionStatus statusId="ISSUED" description="Assertion has been issued" sequenceNum="1"/>
+            <durion.positivity.type.AssertionStatus statusId="USED" description="Assertion has been validated by gateway" sequenceNum="2"/>
+            <durion.positivity.type.AssertionStatus statusId="EXPIRED" description="Assertion has expired" sequenceNum="3"/>
+            <durion.positivity.type.AssertionStatus statusId="REVOKED" description="Assertion was manually revoked" sequenceNum="4"/>
+        </seed-data>
+    </entity>
+
+</entities>
