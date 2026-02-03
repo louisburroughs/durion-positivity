@@ -11,8 +11,7 @@
     Related: .github/agents/api-catalog.yml CRM domain
     Backend: durion-positivity-backend/pos-customer/src/main/java/com/positivity/customer/controller/CrmAccountsController.java
 -->
-<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
     <!-- ========================================== -->
     <!-- Party/Commercial Account Management -->
@@ -40,7 +39,8 @@
             <parameter name="partyNumber" required="true"/>
             <parameter name="message"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             import groovy.json.JsonOutput
             
@@ -94,7 +94,8 @@
                 ec.message.addError(errorMsg)
                 return
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="get" noun="Party" type="script">
@@ -120,7 +121,8 @@
             <parameter name="createdAt"/>
             <parameter name="updatedAt"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -151,7 +153,8 @@
                 ec.message.addError(errorMsg)
                 return
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -176,7 +179,8 @@
             <parameter name="parties" type="List"/>
             <parameter name="totalCount" type="Integer"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -218,7 +222,8 @@
                 parties = []
                 totalCount = 0
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="merge" noun="Parties" type="script">
@@ -229,8 +234,12 @@
             Requires: PARTY_MERGE permission
         </description>
         <in-parameters>
-            <parameter name="winningPartyId" required="true"><description>Party ID that survives merge</description></parameter>
-            <parameter name="losingPartyId" required="true"><description>Party ID to be merged (marked as MERGED)</description></parameter>
+            <parameter name="winningPartyId" required="true">
+                <description>Party ID that survives merge</description>
+            </parameter>
+            <parameter name="losingPartyId" required="true">
+                <description>Party ID to be merged (marked as MERGED)</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="winningPartyId"/>
@@ -240,7 +249,8 @@
             <parameter name="vehiclesMigrated" type="Integer"/>
             <parameter name="message"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -281,7 +291,8 @@
                 ec.message.addError(errorMsg)
                 return
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -298,9 +309,12 @@
             <parameter name="partyId" required="true"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="contacts" type="List"><description>List of contacts with embedded roles and hasPrimaryEmail flag</description></parameter>
+            <parameter name="contacts" type="List">
+                <description>List of contacts with embedded roles and hasPrimaryEmail flag</description>
+            </parameter>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -331,7 +345,8 @@
                 ec.message.addError(errorMsg)
                 contacts = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="update" noun="ContactRoles" type="script">
@@ -346,13 +361,16 @@
         <in-parameters>
             <parameter name="partyId" required="true"/>
             <parameter name="contactId" required="true"/>
-            <parameter name="roles" type="List" required="true"><description>List of role names (e.g., ["BILLING", "TECHNICAL"])</description></parameter>
+            <parameter name="roles" type="List" required="true">
+                <description>List of role names (e.g., ["BILLING", "TECHNICAL"])</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="success" type="Boolean"/>
             <parameter name="message"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -391,7 +409,8 @@
                 ec.message.addError(errorMsg)
                 success = false
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -411,11 +430,14 @@
             <parameter name="partyId" required="true"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="emailPreference" default-value="OPT_IN"><description>EMAIL, SMS, PHONE preference: OPT_IN, OPT_OUT, UNSUBSCRIBED</description></parameter>
+            <parameter name="emailPreference" default-value="OPT_IN">
+                <description>EMAIL, SMS, PHONE preference: OPT_IN, OPT_OUT, UNSUBSCRIBED</description>
+            </parameter>
             <parameter name="smsPreference" default-value="OPT_IN"/>
             <parameter name="phonePreference" default-value="OPT_IN"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -446,7 +468,8 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="upsert" noun="CommunicationPreferences" type="script">
@@ -460,7 +483,9 @@
         </description>
         <in-parameters>
             <parameter name="partyId" required="true"/>
-            <parameter name="emailPreference" required="true"><description>OPT_IN, OPT_OUT, or UNSUBSCRIBED</description></parameter>
+            <parameter name="emailPreference" required="true">
+                <description>OPT_IN, OPT_OUT, or UNSUBSCRIBED</description>
+            </parameter>
             <parameter name="smsPreference" required="true"/>
             <parameter name="phonePreference" required="true"/>
         </in-parameters>
@@ -468,7 +493,8 @@
             <parameter name="success" type="Boolean"/>
             <parameter name="message"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -513,7 +539,8 @@
                 ec.message.addError(errorMsg)
                 success = false
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -530,14 +557,17 @@
         </description>
         <in-parameters>
             <parameter name="partyId" required="true"/>
-            <parameter name="vin" required="true"><description>Vehicle Identification Number (17 characters)</description></parameter>
+            <parameter name="vin" required="true">
+                <description>Vehicle Identification Number (17 characters)</description>
+            </parameter>
             <parameter name="nickname"/>
         </in-parameters>
         <out-parameters>
             <parameter name="vehicleId"/>
             <parameter name="message"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -581,7 +611,8 @@
                 ec.message.addError(errorMsg)
                 return
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -597,7 +628,8 @@
         <out-parameters>
             <parameter name="customers" type="List"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -624,7 +656,8 @@
                 ec.message.addError(errorMsg)
                 customers = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="get" noun="Customer" type="script">
@@ -639,7 +672,8 @@
         <out-parameters>
             <parameter name="customer" type="Map"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -667,7 +701,8 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="create" noun="Customer" type="script">
@@ -677,12 +712,15 @@
             Requires: PARTY_CREATE permission
         </description>
         <in-parameters>
-            <parameter name="customer" type="Map" required="true"><description>Customer object to create</description></parameter>
+            <parameter name="customer" type="Map" required="true">
+                <description>Customer object to create</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="customer" type="Map"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -711,7 +749,8 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="update" noun="Customer" type="script">
@@ -722,12 +761,15 @@
         </description>
         <in-parameters>
             <parameter name="customerId" required="true"/>
-            <parameter name="customer" type="Map" required="true"><description>Updated customer object</description></parameter>
+            <parameter name="customer" type="Map" required="true">
+                <description>Updated customer object</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="customer" type="Map"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -758,7 +800,8 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="delete" noun="Customer" type="script">
@@ -773,7 +816,8 @@
         <out-parameters>
             <parameter name="success" type="Boolean"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -803,7 +847,8 @@
                 ec.message.addError(errorMsg)
                 success = false
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -824,7 +869,8 @@
             <parameter name="tier" type="Map"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -852,7 +898,8 @@
                 String errorMsg = "Failed to get account tier: ${response.statusCode} ${response.reasonPhrase}"
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="resolve" noun="AccountTiers" type="script">
@@ -863,13 +910,16 @@
             Note: Backend endpoint currently returns 501 NOT_IMPLEMENTED.
         </description>
         <in-parameters>
-            <parameter name="accountIds" type="List" required="true"><description>List of account IDs to resolve tiers for</description></parameter>
+            <parameter name="accountIds" type="List" required="true">
+                <description>List of account IDs to resolve tiers for</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="tiers" type="List"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -908,7 +958,8 @@
                 ec.message.addError(errorMsg)
                 tiers = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <!-- ========================================== -->
@@ -925,13 +976,16 @@
         </description>
         <in-parameters>
             <parameter name="customerId" required="true"/>
-            <parameter name="vehicles" type="List" required="true"><description>List of vehicles to create</description></parameter>
+            <parameter name="vehicles" type="List" required="true">
+                <description>List of vehicles to create</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="createdVehicles" type="List"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -970,7 +1024,8 @@
                 ec.message.addError(errorMsg)
                 createdVehicles = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="update" noun="Vehicles" type="script">
@@ -983,13 +1038,16 @@
         </description>
         <in-parameters>
             <parameter name="customerId" required="true"/>
-            <parameter name="vehicles" type="List" required="true"><description>List of vehicles to update</description></parameter>
+            <parameter name="vehicles" type="List" required="true">
+                <description>List of vehicles to update</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="updatedVehicles" type="List"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1028,7 +1086,8 @@
                 ec.message.addError(errorMsg)
                 updatedVehicles = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="delete" noun="Vehicle" type="script">
@@ -1047,7 +1106,8 @@
             <parameter name="success" type="Boolean"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1079,7 +1139,8 @@
                 ec.message.addError(errorMsg)
                 success = false
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="transfer" noun="Vehicle" type="script">
@@ -1101,7 +1162,8 @@
             <parameter name="message"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1143,7 +1205,8 @@
                 ec.message.addError(errorMsg)
                 success = false
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="get" noun="Vehicle" type="script">
@@ -1162,7 +1225,8 @@
             <parameter name="vehicle" type="Map"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1199,7 +1263,8 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="list" noun="VehiclesFiltered" type="script">
@@ -1222,7 +1287,8 @@
             <parameter name="vehicles" type="List"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1268,7 +1334,8 @@
                 ec.message.addError(errorMsg)
                 vehicles = []
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
     </service>
 
     <service verb="get" noun="VehiclesForCustomer" type="script">
@@ -1288,7 +1355,8 @@
             <parameter name="vehicle" type="Map"/>
             <parameter name="notImplemented" type="Boolean" default-value="true"/>
         </out-parameters>
-        <actions><script><![CDATA[
+        <actions>
+            <script><![CDATA[
             import org.moqui.util.RestClient
             
             String backendUrl = System.getProperty('pos.customer.url', 
@@ -1325,7 +1393,319 @@
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
             }
-        ]]></script></actions>
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <!-- ========================================== -->
+    <!-- Vehicle Management (CAP:091) -->
+    <!-- ========================================== -->
+
+    <service verb="create" noun="VehicleForCustomer" type="script">
+        <description>
+            Create a new vehicle and associate it with a customer.
+            Maps to POST /v1/crm/{customerId}/vehicles
+            Requires: VEHICLE_CREATE permission
+            Story #169 (CAP:091)
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vinNumber" required="true"/>
+            <parameter name="unitNumber" required="true"/>
+            <parameter name="description" required="true"/>
+            <parameter name="licensePlate"/>
+            <parameter name="licensePlateRegion"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicleId"/>
+            <parameter name="accountId"/>
+            <parameter name="vin"/>
+            <parameter name="vinNormalized"/>
+            <parameter name="unitNumber"/>
+            <parameter name="description"/>
+            <parameter name="licensePlate"/>
+            <parameter name="licensePlateJurisdiction"/>
+            <parameter name="year" type="Integer"/>
+            <parameter name="make"/>
+            <parameter name="model"/>
+            <parameter name="trim"/>
+            <parameter name="isActive" type="Boolean"/>
+            <parameter name="createdAt"/>
+            <parameter name="updatedAt"/>
+            <parameter name="version" type="Long"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                vinNumber: vinNumber,
+                unitNumber: unitNumber,
+                description: description,
+                licensePlate: licensePlate,
+                licensePlateRegion: licensePlateRegion
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('POST')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 201) {
+                Map responseBody = (Map) response.jsonObject()
+                context.putAll(responseBody)
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer not found: ${customerId}")
+                return
+            } else if (response.statusCode == 400) {
+                String errorMsg = "Invalid vehicle data"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            } else {
+                String errorMsg = "Failed to create vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <service verb="update" noun="VehicleForCustomer" type="script">
+        <description>
+            Update vehicle information for a customer.
+            Maps to PUT /v1/crm/{customerId}/vehicles/{vehicleId}
+            Requires: VEHICLE_EDIT permission
+            Story #169 (CAP:091)
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicleId" required="true"/>
+            <parameter name="vinNumber"/>
+            <parameter name="unitNumber"/>
+            <parameter name="description"/>
+            <parameter name="licensePlate"/>
+            <parameter name="licensePlateRegion"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicleId"/>
+            <parameter name="accountId"/>
+            <parameter name="vin"/>
+            <parameter name="vinNormalized"/>
+            <parameter name="unitNumber"/>
+            <parameter name="description"/>
+            <parameter name="licensePlate"/>
+            <parameter name="licensePlateJurisdiction"/>
+            <parameter name="year" type="Integer"/>
+            <parameter name="make"/>
+            <parameter name="model"/>
+            <parameter name="trim"/>
+            <parameter name="isActive" type="Boolean"/>
+            <parameter name="createdAt"/>
+            <parameter name="updatedAt"/>
+            <parameter name="version" type="Long"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                vinNumber: vinNumber,
+                unitNumber: unitNumber,
+                description: description,
+                licensePlate: licensePlate,
+                licensePlateRegion: licensePlateRegion
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                context.putAll(responseBody)
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer or vehicle not found")
+                return
+            } else if (response.statusCode == 400) {
+                String errorMsg = "Invalid vehicle data"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            } else {
+                String errorMsg = "Failed to update vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <service verb="delete" noun="VehicleForCustomer" type="script">
+        <description>
+            Delete or deactivate a vehicle for a customer.
+            Maps to DELETE /v1/crm/{customerId}/vehicles/{vehicleId}
+            Requires: VEHICLE_DEACTIVATE permission
+            Story #169 (CAP:091)
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true"/>
+            <parameter name="vehicleId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="success" type="Boolean" default-value="false"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            RestClient restClient = ec.service.rest()
+                .method('DELETE')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 204) {
+                success = true
+                ec.message.addMessage("Vehicle deleted successfully")
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer or vehicle not found")
+                return
+            } else {
+                String errorMsg = "Failed to delete vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]>            </script>
+        </actions>
+    </service>
+
+    <service verb="transfer" noun="VehicleBetweenCustomers" type="script">
+        <description>
+            Transfer vehicle ownership between customers.
+            Maps to PUT /v1/crm/{customerId}/vehicles/{vehicleId}/transfer
+            Requires: VEHICLE_PARTY_ASSOC_EDIT permission
+            Story #168 (CAP:091)
+        </description>
+        <in-parameters>
+            <parameter name="customerId" required="true">
+                <description>Source customer ID</description>
+            </parameter>
+            <parameter name="vehicleId" required="true"/>
+            <parameter name="targetCustomerId" required="true"/>
+            <parameter name="notes"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicleId"/>
+            <parameter name="accountId"/>
+            <parameter name="vin"/>
+            <parameter name="vinNormalized"/>
+            <parameter name="unitNumber"/>
+            <parameter name="description"/>
+            <parameter name="licensePlate"/>
+            <parameter name="licensePlateJurisdiction"/>
+            <parameter name="year" type="Integer"/>
+            <parameter name="make"/>
+            <parameter name="model"/>
+            <parameter name="trim"/>
+            <parameter name="isActive" type="Boolean"/>
+            <parameter name="createdAt"/>
+            <parameter name="updatedAt"/>
+            <parameter name="version" type="Long"/>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+            
+            String backendUrl = System.getProperty('pos.customer.url', 
+                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8081')
+            String jwtToken = ec.user.getLoginToken()
+            
+            Map requestBody = [
+                targetCustomerId: targetCustomerId,
+                notes: notes
+            ]
+            
+            RestClient restClient = ec.service.rest()
+                .method('PUT')
+                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}/transfer")
+                .addHeader('Content-Type', 'application/json')
+                .addHeader('Accept', 'application/json')
+            
+            if (jwtToken) {
+                restClient.addHeader('Authorization', "Bearer ${jwtToken}")
+            }
+            
+            restClient.jsonObject(requestBody)
+            
+            RestClient.RestResponse response = restClient.call()
+            
+            if (response.statusCode == 200) {
+                Map responseBody = (Map) response.jsonObject()
+                context.putAll(responseBody)
+                ec.message.addMessage("Vehicle transferred successfully")
+            } else if (response.statusCode == 404) {
+                ec.message.addError("Customer or vehicle not found")
+                return
+            } else if (response.statusCode == 400) {
+                String errorMsg = "Invalid transfer request"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            } else {
+                String errorMsg = "Failed to transfer vehicle: ${response.statusCode} ${response.reasonPhrase}"
+                Map errorBody = response.jsonObject() as Map
+                if (errorBody?.message) errorMsg = errorBody.message
+                ec.message.addError(errorMsg)
+                return
+            }
+        ]]>            </script>
+        </actions>
     </service>
 
 </services>

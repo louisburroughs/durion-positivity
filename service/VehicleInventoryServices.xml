@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="search" noun="Vehicles">
+        <description>Search vehicles by VIN, Unit Number, or License Plate</description>
+        <in-parameters>
+            <parameter name="query" required="true" type="String">
+                <description>Search query (VIN, Unit Number, or License Plate)</description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer" default="0">
+                <description>Page number (0-based)</description>
+            </parameter>
+            <parameter name="pageSize" type="Integer" default="20">
+                <description>Number of results per page</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicles" type="List">
+                <description>List of vehicle search results</description>
+            </parameter>
+            <parameter name="totalCount" type="Long">
+                <description>Total number of matching vehicles</description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer">
+                <description>Current page index</description>
+            </parameter>
+            <parameter name="pageSize" type="Integer">
+                <description>Page size used</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import groovy.json.JsonSlurper
+                import org.moqui.util.RestClient
+                
+                try {
+                    // Get backend URL
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8086')
+                    
+                    // Build search request
+                    Map requestBody = [
+                        query: query,
+                        pageIndex: pageIndex,
+                        pageSize: pageSize
+                    ]
+                    
+                    // Get JWT token
+                    String jwtToken = ec.user.getLoginToken()
+                    
+                    // Call backend search endpoint
+                    RestClient restClient = ec.service.rest()
+                        .method(RestClient.POST)
+                        .uri(vehicleBaseUrl + '/v1/vehicles/search')
+                        .contentType('application/json')
+                        .addHeader('Authorization', 'Bearer ' + jwtToken)
+                        .jsonObject(requestBody)
+                    
+                    RestClient.RestResponse response = restClient.call()
+                    
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        def jsonSlurper = new JsonSlurper()
+                        Map result = jsonSlurper.parseText(response.text())
+                        
+                        vehicles = result.vehicles ?: []
+                        totalCount = result.totalCount ?: 0L
+                        pageIndex = result.pageIndex ?: 0
+                        pageSize = result.pageSize ?: 20
+                    } else {
+                        ec.message.addError("Failed to search vehicles: ${response.statusCode()} - ${response.reasonPhrase()}")
+                        vehicles = []
+                        totalCount = 0L
+                    }
+                } catch (Exception e) {
+                    ec.logger.error("Error searching vehicles: ${e.message}", e)
+                    ec.message.addError("Error searching vehicles: ${e.message}")
+                    vehicles = []
+                    totalCount = 0L
+                }
+            ]]>            </script>
+        </actions>
+    </service>
+
+    <service verb="get" noun="Vehicle">
+        <description>Get vehicle details by ID</description>
+        <in-parameters>
+            <parameter name="vehicleId" required="true" type="String">
+                <description>Vehicle UUID</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="vehicle" type="Map">
+                <description>Vehicle details</description>
+            </parameter>
+            <parameter name="vehicleId" type="String">
+                <description>Vehicle ID</description>
+            </parameter>
+            <parameter name="vin" type="String">
+                <description>VIN</description>
+            </parameter>
+            <parameter name="unitNumber" type="String">
+                <description>Unit Number</description>
+            </parameter>
+            <parameter name="description" type="String">
+                <description>Description</description>
+            </parameter>
+            <parameter name="licensePlate" type="String">
+                <description>License Plate</description>
+            </parameter>
+            <parameter name="licensePlateRegion" type="String">
+                <description>License Plate Region</description>
+            </parameter>
+            <parameter name="accountId" type="String">
+                <description>Account ID</description>
+            </parameter>
+            <parameter name="createdBy" type="String">
+                <description>Created By</description>
+            </parameter>
+            <parameter name="createdAt" type="String">
+                <description>Created timestamp</description>
+            </parameter>
+            <parameter name="updatedAt" type="String">
+                <description>Updated timestamp</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <script><![CDATA[
+                import groovy.json.JsonSlurper
+                import org.moqui.util.RestClient
+                
+                try {
+                    // Get backend URL
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8086')
+                    
+                    // Get JWT token
+                    String jwtToken = ec.user.getLoginToken()
+                    
+                    // Call backend get endpoint
+                    RestClient restClient = ec.service.rest()
+                        .method(RestClient.GET)
+                        .uri(vehicleBaseUrl + '/v1/vehicles/' + vehicleId)
+                        .contentType('application/json')
+                        .addHeader('Authorization', 'Bearer ' + jwtToken)
+                    
+                    RestClient.RestResponse response = restClient.call()
+                    
+                    if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                        def jsonSlurper = new JsonSlurper()
+                        vehicle = jsonSlurper.parseText(response.text())
+                        
+                        // Extract individual fields for convenience
+                        vehicleId = vehicle.vehicleId
+                        vin = vehicle.vin
+                        unitNumber = vehicle.unitNumber
+                        description = vehicle.description
+                        licensePlate = vehicle.licensePlate
+                        licensePlateRegion = vehicle.licensePlateRegion
+                        accountId = vehicle.accountId
+                        createdBy = vehicle.createdBy
+                        createdAt = vehicle.createdAt
+                        updatedAt = vehicle.updatedAt
+                    } else if (response.statusCode() == 404) {
+                        ec.message.addError("Vehicle not found: ${vehicleId}")
+                        vehicle = null
+                    } else {
+                        ec.message.addError("Failed to get vehicle: ${response.statusCode()} - ${response.reasonPhrase()}")
+                        vehicle = null
+                    }
+                } catch (Exception e) {
+                    ec.logger.error("Error getting vehicle: ${e.message}", e)
+                    ec.message.addError("Error getting vehicle: ${e.message}")
+                    vehicle = null
+                }
+            ]]>            </script>
+        </actions>
+    </service>
+
+</services>
