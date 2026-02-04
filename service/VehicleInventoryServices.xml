@@ -35,7 +35,7 @@
                 
                 try {
                     // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url',
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 
                                            System.getenv('POS_VEHICLE_INVENTORY_URL') ?: 'http://localhost:8089')
                     
                     // Build search request
@@ -53,8 +53,11 @@
                         .method(RestClient.POST)
                         .uri(vehicleBaseUrl + '/v1/vehicles/search')
                         .contentType('application/json')
-                        .addHeader('Authorization', 'Bearer ' + jwtToken)
                         .jsonObject(requestBody)
+                    
+                    if (jwtToken) {
+                        restClient.addHeader('Authorization', 'Bearer ' + jwtToken)
+                    }
                     
                     RestClient.RestResponse response = restClient.call()
                     
@@ -130,7 +133,7 @@
                 
                 try {
                     // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url',
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 
                                            System.getenv('POS_VEHICLE_INVENTORY_URL') ?: 'http://localhost:8089')
                     
                     // Get JWT token
@@ -141,7 +144,11 @@
                         .method(RestClient.GET)
                         .uri(vehicleBaseUrl + '/v1/vehicles/' + vehicleId)
                         .contentType('application/json')
-                        .addHeader('Authorization', 'Bearer ' + jwtToken)
+                    
+                    // Add Authorization header only if JWT token is present
+                    if (jwtToken) {
+                        restClient = restClient.addHeader('Authorization', 'Bearer ' + jwtToken)
+                    }
                     
                     RestClient.RestResponse response = restClient.call()
                     
