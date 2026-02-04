@@ -35,7 +35,7 @@
                 
                 try {
                     // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8086')
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8089')
                     
                     // Build search request
                     Map requestBody = [
@@ -129,7 +129,7 @@
                 
                 try {
                     // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8086')
+                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 'http://localhost:8089')
                     
                     // Get JWT token
                     String jwtToken = ec.user.getLoginToken()
