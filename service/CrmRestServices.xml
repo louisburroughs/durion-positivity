@@ -1724,14 +1724,22 @@
                 return
             } else if (response.statusCode == 400) {
                 String errorMsg = "Invalid transfer request"
-                Map errorBody = response.jsonObject() as Map
-                if (errorBody?.message) errorMsg = errorBody.message
+                try {
+                    Map errorBody = response.jsonObject() as Map
+                    if (errorBody?.message) errorMsg = errorBody.message
+                } catch (Exception ignored) {
+                    // ignore parsing errors and fall back to default errorMsg
+                }
                 ec.message.addError(errorMsg)
                 return
             } else {
                 String errorMsg = "Failed to transfer vehicle: ${response.statusCode} ${response.reasonPhrase}"
-                Map errorBody = response.jsonObject() as Map
-                if (errorBody?.message) errorMsg = errorBody.message
+                try {
+                    Map errorBody = response.jsonObject() as Map
+                    if (errorBody?.message) errorMsg = errorBody.message
+                } catch (Exception ignored) {
+                    // ignore parsing errors and fall back to default errorMsg
+                }
                 ec.message.addError(errorMsg)
                 return
             }
