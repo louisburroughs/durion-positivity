@@ -142,7 +142,11 @@
                         .method(RestClient.GET)
                         .uri(vehicleBaseUrl + '/v1/vehicles/' + vehicleId)
                         .contentType('application/json')
-                        .addHeader('Authorization', 'Bearer ' + jwtToken)
+                    
+                    // Add Authorization header only if JWT token is present
+                    if (jwtToken) {
+                        restClient = restClient.addHeader('Authorization', 'Bearer ' + jwtToken)
+                    }
                     
                     RestClient.RestResponse response = restClient.call()
                     
