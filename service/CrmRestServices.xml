@@ -1414,7 +1414,7 @@
             <parameter name="unitNumber" required="true"/>
             <parameter name="description" required="true"/>
             <parameter name="licensePlate"/>
-            <parameter name="licensePlateRegion"/>
+            <parameter name="licensePlateJurisdiction"/>
         </in-parameters>
         <out-parameters>
             <parameter name="vehicleId"/>
@@ -1447,7 +1447,7 @@
                 unitNumber: unitNumber,
                 description: description,
                 licensePlate: licensePlate,
-                licensePlateRegion: licensePlateRegion
+                licensePlateJurisdiction: licensePlateJurisdiction
             ]
             
             RestClient restClient = ec.service.rest()
@@ -1511,7 +1511,7 @@
             <parameter name="unitNumber"/>
             <parameter name="description"/>
             <parameter name="licensePlate"/>
-            <parameter name="licensePlateRegion"/>
+            <parameter name="licensePlateJurisdiction"/>
         </in-parameters>
         <out-parameters>
             <parameter name="vehicleId"/>
@@ -1544,7 +1544,7 @@
                 unitNumber: unitNumber,
                 description: description,
                 licensePlate: licensePlate,
-                licensePlateRegion: licensePlateRegion
+                licensePlateJurisdiction: licensePlateJurisdiction
             ]
             
             RestClient restClient = ec.service.rest()
