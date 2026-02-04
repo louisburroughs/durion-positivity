@@ -1410,7 +1410,7 @@
         </description>
         <in-parameters>
             <parameter name="customerId" required="true"/>
-            <parameter name="vinNumber" required="true"/>
+            <parameter name="vin" required="true"/>
             <parameter name="unitNumber" required="true"/>
             <parameter name="description" required="true"/>
             <parameter name="licensePlate"/>
@@ -1443,7 +1443,7 @@
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
-                vinNumber: vinNumber,
+                vinNumber: vin,
                 unitNumber: unitNumber,
                 description: description,
                 licensePlate: licensePlate,
@@ -1507,7 +1507,7 @@
         <in-parameters>
             <parameter name="customerId" required="true"/>
             <parameter name="vehicleId" required="true"/>
-            <parameter name="vinNumber"/>
+            <parameter name="vin"/>
             <parameter name="unitNumber"/>
             <parameter name="description"/>
             <parameter name="licensePlate"/>
@@ -1540,7 +1540,7 @@
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
-                vinNumber: vinNumber,
+                vinNumber: vin,
                 unitNumber: unitNumber,
                 description: description,
                 licensePlate: licensePlate,
