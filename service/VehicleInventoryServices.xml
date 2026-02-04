@@ -52,8 +52,11 @@
                         .method(RestClient.POST)
                         .uri(vehicleBaseUrl + '/v1/vehicles/search')
                         .contentType('application/json')
-                        .addHeader('Authorization', 'Bearer ' + jwtToken)
                         .jsonObject(requestBody)
+                    
+                    if (jwtToken) {
+                        restClient.addHeader('Authorization', 'Bearer ' + jwtToken)
+                    }
                     
                     RestClient.RestResponse response = restClient.call()
                     
