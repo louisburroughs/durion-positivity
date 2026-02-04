@@ -1631,7 +1631,12 @@
                 return
             } else {
                 String errorMsg = "Failed to delete vehicle: ${response.statusCode} ${response.reasonPhrase}"
-                Map errorBody = response.jsonObject() as Map
+                Map errorBody = null
+                try {
+                    errorBody = response.jsonObject() as Map
+                } catch (Exception ignored) {
+                    // Ignore JSON parsing errors; fall back to generic error message
+                }
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
                 return
