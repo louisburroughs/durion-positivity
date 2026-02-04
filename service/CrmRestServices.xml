@@ -1472,13 +1472,23 @@
                 return
             } else if (response.statusCode == 400) {
                 String errorMsg = "Invalid vehicle data"
-                Map errorBody = response.jsonObject() as Map
+                Map errorBody = null
+                try {
+                    errorBody = response.jsonObject() as Map
+                } catch (Exception ignored) {
+                    // Non-JSON or otherwise unparsable error body; keep default message
+                }
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
                 return
             } else {
                 String errorMsg = "Failed to create vehicle: ${response.statusCode} ${response.reasonPhrase}"
-                Map errorBody = response.jsonObject() as Map
+                Map errorBody = null
+                try {
+                    errorBody = response.jsonObject() as Map
+                } catch (Exception ignored) {
+                    // Non-JSON or otherwise unparsable error body; keep default message
+                }
                 if (errorBody?.message) errorMsg = errorBody.message
                 ec.message.addError(errorMsg)
                 return
