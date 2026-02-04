@@ -1521,7 +1521,7 @@
             <parameter name="unitNumber"/>
             <parameter name="description"/>
             <parameter name="licensePlate"/>
-            <parameter name="licensePlateJurisdiction"/>
+            <parameter name="licensePlateRegion"/>
             <parameter name="year" type="Integer"/>
             <parameter name="make"/>
             <parameter name="model"/>
