@@ -106,8 +106,8 @@
             <parameter name="licensePlate" type="String">
                 <description>License Plate</description>
             </parameter>
-            <parameter name="licensePlateRegion" type="String">
-                <description>License Plate Region</description>
+            <parameter name="licensePlateJurisdiction" type="String">
+                <description>License Plate Jurisdiction</description>
             </parameter>
             <parameter name="accountId" type="String">
                 <description>Account ID</description>
@@ -153,7 +153,7 @@
                         unitNumber = vehicle.unitNumber
                         description = vehicle.description
                         licensePlate = vehicle.licensePlate
-                        licensePlateRegion = vehicle.licensePlateRegion
+                        licensePlateJurisdiction = vehicle.licensePlateJurisdiction
                         accountId = vehicle.accountId
                         createdBy = vehicle.createdBy
                         createdAt = vehicle.createdAt
