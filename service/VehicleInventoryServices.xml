@@ -34,9 +34,9 @@
                 import org.moqui.util.RestClient
                 
                 try {
-                    // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 
-                                           System.getenv('POS_VEHICLE_INVENTORY_URL') ?: 'http://localhost:8089')
+                    // Get API Gateway URL from system property or environment variable
+                    String gatewayUrl = System.getProperty('pos.gateway.url', 
+                                       System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
                     
                     // Build search request
                     Map requestBody = [
@@ -48,11 +48,12 @@
                     // Get JWT token
                     String jwtToken = ec.user.getLoginToken()
                     
-                    // Call backend search endpoint
+                    // Call backend search endpoint through API Gateway
                     RestClient restClient = ec.service.rest()
                         .method(RestClient.POST)
-                        .uri(vehicleBaseUrl + '/v1/vehicles/search')
+                        .uri(gatewayUrl + '/v1/vehicles/search')
                         .contentType('application/json')
+                        .addHeader('X-API-Version', '1')
                         .jsonObject(requestBody)
                     
                     if (jwtToken) {
@@ -132,18 +133,19 @@
                 import org.moqui.util.RestClient
                 
                 try {
-                    // Get backend URL
-                    String vehicleBaseUrl = System.getProperty('pos.vehicle-inventory.url', 
-                                           System.getenv('POS_VEHICLE_INVENTORY_URL') ?: 'http://localhost:8089')
+                    // Get API Gateway URL from system property or environment variable
+                    String gatewayUrl = System.getProperty('pos.gateway.url', 
+                                       System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
                     
                     // Get JWT token
                     String jwtToken = ec.user.getLoginToken()
                     
-                    // Call backend get endpoint
+                    // Call backend get endpoint through API Gateway
                     RestClient restClient = ec.service.rest()
                         .method(RestClient.GET)
-                        .uri(vehicleBaseUrl + '/v1/vehicles/' + vehicleId)
+                        .uri(gatewayUrl + '/v1/vehicles/' + vehicleId)
                         .contentType('application/json')
+                        .addHeader('X-API-Version', '1')
                     
                     // Add Authorization header only if JWT token is present
                     if (jwtToken) {

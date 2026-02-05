@@ -44,9 +44,9 @@
             import org.moqui.util.RestClient
             import groovy.json.JsonOutput
             
-            // Get backend URL from system property or environment variable
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            // Get API Gateway URL from system property or environment variable
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             
             // Build request body
             Map requestBody = [
@@ -64,12 +64,13 @@
             // Get JWT token from current user session
             String jwtToken = ec.user.getLoginToken()
             
-            // Make REST call to pos-customer backend
+            // Make REST call through API Gateway
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/parties")
+                .uri("${gatewayUrl}/v1/crm/parties")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -125,14 +126,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -183,8 +185,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -198,9 +200,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/parties/search")
+                .uri("${gatewayUrl}/v1/crm/parties/search")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -253,8 +256,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -263,9 +266,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/parties/${winningPartyId}/merge")
+                .uri("${gatewayUrl}/v1/crm/parties/${winningPartyId}/merge")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -317,14 +321,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}/contacts")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}/contacts")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -373,8 +378,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -383,9 +388,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}/contacts/${contactId}/roles")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}/contacts/${contactId}/roles")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -440,14 +446,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}/communicationPreferences")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}/communicationPreferences")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -497,8 +504,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -509,9 +516,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}/communicationPreferences")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}/communicationPreferences")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -570,8 +578,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -581,9 +589,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/parties/${partyId}/vehicles")
+                .uri("${gatewayUrl}/v1/crm/parties/${partyId}/vehicles")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -632,14 +641,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm")
+                .uri("${gatewayUrl}/v1/crm")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -676,14 +686,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm/${customerId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -723,15 +734,16 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm")
+                .uri("${gatewayUrl}/v1/crm")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -772,15 +784,16 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/${customerId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -820,14 +833,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('DELETE')
-                .uri("${backendUrl}/v1/crm/${customerId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -873,14 +887,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('GET')
-                .uri("${backendUrl}/v1/crm/accounts/${accountId}/tier")
+                .uri("${gatewayUrl}/v1/crm/accounts/${accountId}/tier")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -922,8 +937,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -932,9 +947,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/accounts/tierResolve")
+                .uri("${gatewayUrl}/v1/crm/accounts/tierResolve")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -988,8 +1004,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -998,9 +1014,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1050,8 +1067,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -1060,9 +1077,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1110,14 +1128,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('DELETE')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1166,8 +1185,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -1177,9 +1196,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/${fromCustomerId}/vehicles/${vehicleId}/transfer")
+                .uri("${gatewayUrl}/v1/crm/${fromCustomerId}/vehicles/${vehicleId}/transfer")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1229,11 +1249,11 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
-            String uri = "${backendUrl}/v1/crm/vehicles/${vehicleId}"
+            String uri = "${gatewayUrl}/v1/crm/vehicles/${vehicleId}"
             if (includeOwner) {
                 uri += "?include=owner"
             }
@@ -1242,6 +1262,7 @@
                 .method('GET')
                 .uri(uri)
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1291,8 +1312,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             // Build query parameters
@@ -1304,7 +1325,7 @@
             if (sortOrder) queryParams.add("sortOrder=${sortOrder}")
             if (includeOwner) queryParams.add("include=owner")
             
-            String uri = "${backendUrl}/v1/crm/vehicles"
+            String uri = "${gatewayUrl}/v1/crm/vehicles"
             if (queryParams) {
                 uri += "?" + queryParams.join("&")
             }
@@ -1313,6 +1334,7 @@
                 .method('GET')
                 .uri(uri)
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1359,11 +1381,11 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
-            String uri = "${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}"
+            String uri = "${gatewayUrl}/v1/crm/${customerId}/vehicles/${vehicleId}"
             if (includeOwner) {
                 uri += "?include=owner"
             }
@@ -1372,6 +1394,7 @@
                 .method('GET')
                 .uri(uri)
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1438,8 +1461,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -1452,9 +1475,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('POST')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1535,8 +1559,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -1549,9 +1573,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1618,14 +1643,15 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             RestClient restClient = ec.service.rest()
                 .method('DELETE')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles/${vehicleId}")
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
@@ -1692,8 +1718,8 @@
             <script><![CDATA[
             import org.moqui.util.RestClient
             
-            String backendUrl = System.getProperty('pos.customer.url', 
-                               System.getenv('POS_CUSTOMER_URL') ?: 'http://localhost:8082')
+            String gatewayUrl = System.getProperty('pos.gateway.url', 
+                               System.getenv('POS_GATEWAY_URL') ?: 'http://localhost:8080')
             String jwtToken = ec.user.getLoginToken()
             
             Map requestBody = [
@@ -1703,9 +1729,10 @@
             
             RestClient restClient = ec.service.rest()
                 .method('PUT')
-                .uri("${backendUrl}/v1/crm/${customerId}/vehicles/${vehicleId}/transfer")
+                .uri("${gatewayUrl}/v1/crm/${customerId}/vehicles/${vehicleId}/transfer")
                 .addHeader('Content-Type', 'application/json')
                 .addHeader('Accept', 'application/json')
+                .addHeader('X-API-Version', '1')
             
             if (jwtToken) {
                 restClient.addHeader('Authorization', "Bearer ${jwtToken}")
